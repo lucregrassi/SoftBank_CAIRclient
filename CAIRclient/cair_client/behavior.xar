@@ -63,13 +63,15 @@ load_dotenv('/data/home/nao/.local/share/PackageManager/apps/cair_client/.env')
 
 # Access environment variables
 openai_api_key = os.getenv('OPENAI_API_KEY')
-robot_name = "baldo"
+robot_name = "ribe"
 
 dense_cap = False
-log_data = False
+log_data = True
+interventions = False
+resume_conversation_state = False
 
 lab_server = "130.251.13.192"
-local_server = "192.168.178.53"
+local_server = "192.168.1.58"
 raspberry = "130.251.13.124"
 
 # Set the location of the server
@@ -130,7 +132,8 @@ class MyClass(GeneratedClass):
         self.certificate = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/certificates/server_" + server_ip.replace(".", "_") + ".crt"
         self.plans = ActionManager(self.logger)
         self.utils = ClientUtils(self.logger, self.certificate)
-        self.personalization_server = PersonalizationServer(self.logger)
+        if interventions:
+            self.personalization_server = PersonalizationServer(self.logger)
 
         self.speech_reco_event = "Audio/RecognizedWords"
         if language == "it-IT":
@@ -144,12 +147,23 @@ class MyClass(GeneratedClass):
         self.isAlive = True
         self.exit_keywords = ["stop talking", "esci dallapp", "esci dallapplicazione", "quit the application"]
         self.repeat_keywords = ["repeat", "can you repeat", "say it again", "puoi ripetere", "ripeti", "non ho capito"]
-        self.dialogue_state_file_path = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/" \
-                                        "dialogue_state.json"
-        self.speakers_info_file_path = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/" \
-                                       "speakers_info.json"
-        self.dialogue_statistics_file_path = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/" \
-                                             "dialogue_statistics.json"
+        self.dialogue_state_file_path = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/dialogue_state.json"
+        self.speakers_info_file_path = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/speakers_info.json"
+        self.dialogue_statistics_file_path = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/dialogue_statistics.json"
+
+        if not resume_conversation_state:
+            # List of files to check and delete
+            file_paths = [self.dialogue_state_file_path, self.speakers_info_file_path, self.dialogue_statistics_file_path]
+
+            # Check if the files exist and delete them
+            for file_path in file_paths:
+                if os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                        self.logger.info("Removed " + file_path)
+                    except Exception as e:
+                        self.logger.info("Error while removing " + file_path)
+
         self.response_times_file_path = "/data/home/nao/.local/share/PackageManager/apps/" + app_name + "/" \
                                         "response_times.txt"
 
@@ -167,7 +181,7 @@ class MyClass(GeneratedClass):
             self.tablet = False
 
         self.audio_device = ALProxy("ALAudioDevice")
-        self.audio_device.setOutputVolume(80)
+        self.audio_device.setOutputVolume(70)
 
         self.photoCaptureProxy = ALProxy("ALPhotoCapture", "127.0.0.1", 9559)
         self.photoCaptureProxy.setResolution(2)
@@ -185,7 +199,7 @@ class MyClass(GeneratedClass):
         self.plan = ""
         # This variable tells if the user want the robot to repeat a sentence
         self.repeat = False
-        self.connection_lost = False
+        self.server_connection_lost = False
 
         # Read the sentences in files
         self.sentences = {}
@@ -200,18 +214,45 @@ class MyClass(GeneratedClass):
         self.microphone_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.log_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.log_data = log_data
+        self.microphone_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE,  1)
+        self.microphone_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE,  5)
+        self.microphone_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL,  1)
+        self.microphone_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT,  5)
+        self.log_socket.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE,  1)
+        self.log_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE,  1)
+        self.log_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL,  1)
+        self.log_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT,  5)
 
         self.due_intervention = {"type": None, "exclusive": False, "timestamp": None}
         self.past_due_interventions = []
 
     def send_log_data(self, to_log):
         if self.log_data:
-            self.log_socket.send(to_log.encode("utf-8"))
+            try:
+                # Attempt to send data to the socket
+                self.log_socket.send(to_log.encode("utf-8"))
+            except socket.error as e:
+                # Handle the broken pipe error and other socket errors
+                if e.errno == 32:  # 32 is the errno for 'Broken pipe'
+                    self.logger.info("Warning: Broken pipe error occurred. The connection may have been closed.")
+                    # Optionally, handle the closed connection or attempt to reconnect
+                else:
+                    # Handle other socket errors
+                    self.logger.info("Socket error occurred: " + str(e))
+                to_say = "Mi dispiace, ho perso la connessione con il microfono esterno. Controlla che sia acceso o prova a riavviarlo, poi aspetta qualche minuto e poi riavvia anche la mia applicazione!"
+                self.animated_speech.say(self.voice_speed + to_say, self.configuration)
+                self.onInput_onStop()
+            except Exception as e:
+                # Catch any other unexpected exceptions
+                self.logger.info("An error occurred while sending log data: " + str(e))
+                to_say = "Mi dispiace, ho perso la connessione con il microfono esterno. Controlla che sia acceso o prova a riavviarlo, poi aspetta qualche minuto e poi riavvia anche la mia applicazione!"
+                self.animated_speech.say(self.voice_speed + to_say, self.configuration)
+                self.onInput_onStop()
 
     def check_socket_connection(self, received_string):
         if received_string == "":
             if language == "it-IT":
-                to_say = "Mi dispiace, c'è stato qualche problema con la connessione al microfono esterno."
+                to_say = "Mi dispiace, c'è stato qualche problema con la connessione al microfono esterno. Prova a fare quello che farebbe un esperto informatico. Riavvia il microfono, aspetta qualche minuto e poi riavvia anche la mia applicazione per cercare di risolvere il problema!"
             else:
                 to_say = "I'm sorry, there was a problem with the connection to the external microphone."
             self.animated_speech.say(self.voice_speed + to_say, self.configuration)
@@ -274,7 +315,7 @@ class MyClass(GeneratedClass):
                 self.log_socket.connect((audio_recorder_ip, 9092))
         except Exception as e:
             if language == "it-IT":
-                to_say = "Mi dispiace, non riesco a connettermi al microfono o al servizio di log."
+                to_say = "Mi dispiace, non riesco a connettermi al microfono esterno. Come farebbe un buon informatico, controlla che sia acceso, o prova a farlo ripartire, e poi riavvia la mia applicazione. Se il problema persiste, contatta i miei sviluppatori."
             else:
                 to_say = "I'm sorry, I can't connect to the microphone or the log service"
             self.logger.info(str(to_say))
@@ -291,6 +332,9 @@ class MyClass(GeneratedClass):
                 welcome_sentence_str = self.utils.acquire_initial_state(language, openai_api_key)
             except Exception as e:
                 self.logger.info("Something went wrong during the acquisition of the initial state: " + str(e))
+                error_msg = "Mi dispiace, non riesco a connettermi al server. Prova a riavviarmi e se il problema persiste contatta i miei sviluppatori."
+                self.animated_speech.say(self.voice_speed + error_msg, self.configuration)
+                self.onInput_onStop()
 
             # Retrieve starting nuance vectors
             with open(self.nuance_vectors_file_path) as f:
@@ -299,7 +343,7 @@ class MyClass(GeneratedClass):
         else:
             self.logger.info("Users are already present in the info file")
             if language == "it-IT":
-                welcome_back_msg = "È bello rivedervi! Di cosa vorreste parlare?"
+                welcome_back_msg = "È bello vederti di nuovo! Di cosa vorresti parlare?"
             else:
                 welcome_back_msg = "Welcome back! I missed you. What would you like to talk about?"
             welcome_str = welcome_back_msg
@@ -343,7 +387,8 @@ class MyClass(GeneratedClass):
             hub_response = requests.post(BASE_CAIR_hub, data=compressed_data, verify=self.certificate)
         except Exception as e:
             self.logger.info("Something went wrong during hub request: " + str(e))
-            self.onInput_onStop()
+            self.server_connection_lost = True
+            return
 
         end_time = time.time()
         # If the Hub cannot contact the dialogue service, the response will be empty
@@ -377,7 +422,7 @@ class MyClass(GeneratedClass):
                 self.send_log_data(to_log)
         else:
             self.logger.info("No response received from the Hub!")
-            self.connection_lost = True
+            self.server_connection_lost = True
 
     def onInput_onStart(self):
         global language
@@ -390,8 +435,9 @@ class MyClass(GeneratedClass):
             self.tablet_service.preLoadImage(img_path)
             self.tablet_service.showImage(img_path)
 
-        self.logger.info("Starting personalization server in thread")
-        self.personalization_server.start_server_in_thread()
+        if interventions:
+            self.logger.info("Starting personalization server in thread")
+            self.personalization_server.start_server_in_thread()
 
         self.connect_to_audio_and_log_services()
         self.initialize_user_session()
@@ -425,7 +471,10 @@ class MyClass(GeneratedClass):
                 ongoing_conversation = False
 
             # Check if there is a due scheduled intervention
-            due_intervention = self.personalization_server.get_due_intervention()
+            if interventions:
+                due_intervention = self.personalization_server.get_due_intervention()
+            else:
+                due_intervention = self.due_intervention
 
             self.logger.info("---DUE INTERVENTION CHECK: " + json.dumps(due_intervention))
             # If there is no scheduled intervention, reset the type of the class variable to None, meaning that the
@@ -444,6 +493,8 @@ class MyClass(GeneratedClass):
                     received_str = self.microphone_socket.recv(1024).decode('utf-8')
                 except socket.error as e:
                     self.logger.info("Socket error: " + str(e))
+                    to_say = "Mi dispiace, ho perso la connessione con il microfono esterno. Controlla che sia acceso o prova a riavviarlo, poi aspetta qualche minuto e poi riavvia anche la mia applicazione!"
+                    self.animated_speech.say(self.voice_speed + to_say, self.configuration)
                     self.onInput_onStop()
                 # If the received string is empty it means that the connection is broken
                 self.check_socket_connection(received_str)
@@ -511,8 +562,8 @@ class MyClass(GeneratedClass):
 
             # Initialize and start the thread that says something to fill the void while waiting
             filler_sentence_thread = threading.Thread(None, self.say_filler_sentence, args=())
-            #if self.due_intervention["type"] is None:
-            #    filler_sentence_thread.start()
+            if self.due_intervention["type"] is None:
+                filler_sentence_thread.start()
 
             sentence = sentence.replace(".", "")
             # Reset repeat to false, otherwise it will always repeat the previous sentence
@@ -589,12 +640,14 @@ class MyClass(GeneratedClass):
                 self.logger.info("Request 1 thread started")
 
                 # Wait for filler sentence thread only if there is no intervention to do
-                #if self.due_intervention["type"] is None:
-                #    filler_sentence_thread.join()
+                if self.due_intervention["type"] is None:
+                    filler_sentence_thread.join()
                 # Wait for the thread to finish
                 req1_thread.join()
-                if self.connection_lost:
+                if self.server_connection_lost:
                     self.logger.info("Connection with Hub lost")
+                    error_msg = "Mi dispiace, ho perso la connessione con il server. Come farebbe un esperto informatico, prova a riavviare l'applicazione e se il problema persiste contatta i miei sviluppatori."
+                    self.animated_speech.say(self.voice_speed + error_msg, self.configuration)
                     self.onInput_onStop()
 
                 # If there is a plan sentence, it means that something has been matched by the Plan manager service
@@ -657,8 +710,10 @@ class MyClass(GeneratedClass):
 
                 if req2_thread.is_alive():
                     req2_thread.join()
-                if self.connection_lost:
+                if self.server_connection_lost:
                     self.logger.info("Connection with Hub lost!")
+                    error_msg = "Mi dispiace, ho perso la connessione con il server. Come farebbe un esperto informatico, prova a riavviare l'applicazione e se il problema persiste contatta i miei sviluppatori."
+                    self.animated_speech.say(self.voice_speed + error_msg, self.configuration)
                     self.onInput_onStop()
 
                 if self.dialogue_sentence[1][1] != "":
@@ -718,17 +773,21 @@ class MyClass(GeneratedClass):
         # Signal that the behavior has stopped
         self.onStopped()
 
-        # Stop the personalization server
-        self.personalization_server.stop_server()
+        if interventions:
+            # Stop the personalization server
+            self.personalization_server.stop_server()
 
         # Set the robot to interactive mode
         self.al.setState("interactive")
 
         # Reset autonomous abilities
         self.utils.setAutonomousAbilities(True, True, True, True, True)
+        self.speech_reco.setAudioExpression(True)
 
         # Exit the application
         self.logger.info("Exiting the application...")
+
+        # Necessary to immediately kill the behavior and avoid that it proceeds
         sys.exit(0)]]>
                 </content>
               </script>

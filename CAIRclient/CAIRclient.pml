@@ -271,6 +271,7 @@
         <File name="RICE_jasmine" src="html/img/RICE_jasmine.png" />
         <File name="RICE_ofada" src="html/img/RICE_ofada.png" />
         <File name="RICE_venere" src="html/img/RICE_venere.png" />
+        <File name="server_192_168_1_10" src="certificates/server_192_168_1_10.crt" />
     </Resources>
     <Topics />
     <IgnoredPaths />
