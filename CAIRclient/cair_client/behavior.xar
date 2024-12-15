@@ -71,7 +71,7 @@ interventions = False
 resume_conversation_state = False
 
 lab_server = "130.251.13.192"
-local_server = "192.168.1.58"
+local_server = "192.168.1.62"
 raspberry = "130.251.13.124"
 
 # Set the location of the server
