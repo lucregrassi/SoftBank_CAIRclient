@@ -1,25 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<ChoregrapheProject xmlns="http://www.ald.softbankrobotics.com/schema/choregraphe/project.xsd" xar_version="3">
-  <Box name="root" id="-1" localization="8" tooltip="Root box of Choregraphe&apos;s behavior. Highest level possible." x="0" y="0">
-    <bitmap>media/images/box/root.png</bitmap>
-    <script language="4">
-      <content>
-        <![CDATA[]]>
-      </content>
-    </script>
-    <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
-    <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
-    <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
-    <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="4" />
-    <Timeline enable="0">
-      <BehaviorLayer name="behavior_layer1">
-        <BehaviorKeyframe name="keyframe1" index="1">
-          <Diagram>
-            <Box name="CAIR Client" id="1" localization="8" tooltip="This box contains a basic python script and can be used to create any python script box you would like.&#x0A;&#x0A;To edit its script, double-click on it." x="221" y="80">
-              <bitmap>media/images/box/box-python-script.png</bitmap>
-              <script language="4">
-                <content>
-                  <![CDATA[#!usr/bin/python -tt
+<?xml version="1.0" encoding="UTF-8" ?><ChoregrapheProject xmlns="http://www.aldebaran-robotics.com/schema/choregraphe/project.xsd" xar_version="3"><Box name="root" id="-1" localization="8" tooltip="Root box of Choregraphe&apos;s behavior. Highest level possible." x="0" y="0"><bitmap>media/images/box/root.png</bitmap><script language="4"><content><![CDATA[]]></content></script><Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" /><Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" /><Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" /><Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="4" /><Timeline enable="0"><BehaviorLayer name="behavior_layer1"><BehaviorKeyframe name="keyframe1" index="1"><Diagram><Box name="CAIR Client" id="1" localization="8" tooltip="This box contains a basic python script and can be used to create any python script box you would like.&#x0A;&#x0A;To edit its script, double-click on it." x="221" y="80"><bitmap>media/images/box/box-python-script.png</bitmap><script language="4"><content><![CDATA[#!usr/bin/python -tt
 # -*- coding: utf-8 -*-
 
 import sys
@@ -66,12 +45,13 @@ openai_api_key = os.getenv('OPENAI_API_KEY')
 robot_name = "ribe"
 
 dense_cap = False
-log_data = True
+log_data = False
 interventions = False
-resume_conversation_state = False
+resume_conversation_state = True
+formal_language = False
 
-lab_server = "130.251.13.192"
-local_server = "192.168.1.62"
+lab_server = "130.251.2.192"
+local_server = "10.186.13.63"
 raspberry = "130.251.13.124"
 
 # Set the location of the server
@@ -181,7 +161,7 @@ class MyClass(GeneratedClass):
             self.tablet = False
 
         self.audio_device = ALProxy("ALAudioDevice")
-        self.audio_device.setOutputVolume(70)
+        self.audio_device.setOutputVolume(30)
 
         self.photoCaptureProxy = ALProxy("ALPhotoCapture", "127.0.0.1", 9559)
         self.photoCaptureProxy.setResolution(2)
@@ -359,6 +339,8 @@ class MyClass(GeneratedClass):
         with open(self.dialogue_state_file_path) as f:
             self.dialogue_state = DialogueState(d=json.load(f))
 
+        self.dialogue_state.formal_language = False
+
         # If it is the first time, fill the nuance vectors from the file
         if len(self.nuance_vectors) != 0:
             self.dialogue_state.dialogue_nuances = self.nuance_vectors
@@ -442,7 +424,6 @@ class MyClass(GeneratedClass):
         self.connect_to_audio_and_log_services()
         self.initialize_user_session()
         self.load_conversation_state()
-
 
         prev_turn_last_speaker = ""
         prev_speaker_topic = ""
@@ -788,19 +769,4 @@ class MyClass(GeneratedClass):
         self.logger.info("Exiting the application...")
 
         # Necessary to immediately kill the behavior and avoid that it proceeds
-        sys.exit(0)]]>
-                </content>
-              </script>
-              <Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" />
-              <Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" />
-              <Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" />
-              <Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="4" />
-            </Box>
-            <Link inputowner="1" indexofinput="2" outputowner="0" indexofoutput="2" />
-            <Link inputowner="0" indexofinput="4" outputowner="1" indexofoutput="4" />
-          </Diagram>
-        </BehaviorKeyframe>
-      </BehaviorLayer>
-    </Timeline>
-  </Box>
-</ChoregrapheProject>
+        sys.exit(0)]]></content></script><Input name="onLoad" type="1" type_size="1" nature="0" inner="1" tooltip="Signal sent when diagram is loaded." id="1" /><Input name="onStart" type="1" type_size="1" nature="2" inner="0" tooltip="Box behavior starts when a signal is received on this input." id="2" /><Input name="onStop" type="1" type_size="1" nature="3" inner="0" tooltip="Box behavior stops when a signal is received on this input." id="3" /><Output name="onStopped" type="1" type_size="1" nature="1" inner="0" tooltip="Signal sent when box behavior is finished." id="4" /></Box><Link inputowner="1" indexofinput="2" outputowner="0" indexofoutput="2" /><Link inputowner="0" indexofinput="4" outputowner="1" indexofoutput="4" /></Diagram></BehaviorKeyframe></BehaviorLayer></Timeline></Box></ChoregrapheProject>
